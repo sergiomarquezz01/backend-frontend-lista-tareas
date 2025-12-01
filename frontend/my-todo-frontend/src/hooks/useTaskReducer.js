@@ -1,119 +1,146 @@
-// frontend/src/hooks/useTaskReducer.js
+import { useReducer, useEffect, useCallback, useState } from 'react';
+import { 
+    fetchTasks, 
+    createTask, 
+    updateTaskStatus, 
+    deleteTask, 
+    clearCompletedTasks,
+    editTask 
+} from '../services/TaskService';
 
-import { useReducer, useEffect } from 'react';
 
-const API_URL = 'http://localhost:5000/api/tasks';
-
-const taskReducer = (state, action) => {
+function taskReducer(tasks, action) {
     switch (action.type) {
         case 'SET_TASKS':
-            return { ...state, tasks: action.payload, loading: false };
+           
+            return action.payload; 
         case 'ADD_TASK':
-            return { ...state, tasks: [action.payload, ...state.tasks] };
-        case 'UPDATE_TASK':
-            return {
-                ...state,
-                tasks: state.tasks.map(task =>
-                    task.id === action.payload.id ? action.payload : task
-                ),
-            };
+          
+            return [action.payload, ...tasks]; 
+        case 'TOGGLE_TASK':
+      
+            return tasks.map(task =>
+                task.id === action.payload.id ? { ...task, completed: action.payload.completed } : task
+            );
         case 'REMOVE_TASK':
-            return {
-                ...state,
-                tasks: state.tasks.filter(task => task.id !== action.payload),
-            };
+       
+            return tasks.filter(task => task.id !== action.payload);
         case 'CLEAR_COMPLETED':
             
-            return {
-                ...state,
-                tasks: state.tasks.filter(task => !task.completed),
-            };
-        case 'LOADING_START':
-            return { ...state, loading: true };
-        case 'LOADING_FAIL':
-            return { ...state, loading: false, error: action.payload };
+            return tasks.filter(task => !task.completed);
+        case 'UPDATE_TASK':
+           
+            return tasks.map(task => 
+                task.id === action.payload.id ? action.payload : task
+            );
         default:
-            return state;
+            return tasks;
     }
-};
-
-const initialState = {
-    tasks: [],
-    loading: true,
-    error: null,
-};
+}
 
 
-export const useTaskReducer = () => {
-    const [state, dispatch] = useReducer(taskReducer, initialState);
+export function useTaskReducer() {
+    const [tasks, dispatch] = useReducer(taskReducer, []);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+
+    const loadTasks = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await fetchTasks();
+            dispatch({ type: 'SET_TASKS', payload: data });
+        } catch (err) {
+            console.error("Error al cargar tareas:", err);
+            setError("Error al cargar tareas: " + err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
    
     useEffect(() => {
-        const fetchTasks = async () => {
-            dispatch({ type: 'LOADING_START' });
-            try {
-                const response = await fetch(API_URL);
-                if (!response.ok) throw new Error('Error al cargar tareas');
-                const data = await response.json();
-                dispatch({ type: 'SET_TASKS', payload: data });
-            } catch (error) {
-                dispatch({ type: 'LOADING_FAIL', payload: error.message });
-                console.error("Error al cargar tareas:", error);
-            }
-        };
-        fetchTasks();
-    }, []);
+        loadTasks();
+    }, [loadTasks]);
 
     
-    const addTask = async (text) => {
+    
+
+    const addTask = async (text, category_id, tags) => {
         try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text }),
-            });
-            const newTask = await response.json();
-            dispatch({ type: 'ADD_TASK', payload: newTask });
-        } catch (error) {
-            console.error("Error al añadir tarea:", error);
+         
+            await createTask(text, category_id, tags);
+            
+            await loadTasks(); 
+
+            setError(null);
+        } catch (err) {
+            setError(err.message);
+            throw err;
         }
     };
 
-    const toggleTask = async (id) => {
+
+    const toggleTask = async (id, completed) => {
         try {
-            const response = await fetch(`${API_URL}/${id}`, { method: 'PUT' });
-            const updatedTask = await response.json();
-            dispatch({ type: 'UPDATE_TASK', payload: updatedTask });
-        } catch (error) {
-            console.error("Error al actualizar tarea:", error);
+            
+            await updateTaskStatus(id, completed);
+            
+            dispatch({ type: 'TOGGLE_TASK', payload: { id, completed } });
+            
+            setError(null);
+        } catch (err) {
+            setError(err.message);
+           
+            loadTasks(); 
         }
     };
 
-    const deleteTask = async (id) => {
+    const removeTask = async (id) => {
         try {
-            await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+            await deleteTask(id);
             dispatch({ type: 'REMOVE_TASK', payload: id });
-        } catch (error) {
-            console.error("Error al eliminar tarea:", error);
+            setError(null);
+        } catch (err) {
+            setError(err.message);
         }
     };
 
-    const clearCompletedTasks = async () => {
+    const clearTasks = async () => {
         try {
-            await fetch(`${API_URL}/completed`, { method: 'DELETE' });
+            await clearCompletedTasks();
             dispatch({ type: 'CLEAR_COMPLETED' });
-        } catch (error) {
-            console.error("Error al limpiar completadas:", error);
+            setError(null);
+        } catch (err) {
+            setError(err.message);
         }
     };
+
+ 
+    const updateTask = async (updatedTaskData) => {
+        try {
+            await editTask(updatedTaskData);
+            
+            await loadTasks(); 
+            setError(null);
+        } catch (err) {
+            setError(err.message);
+            throw err;
+        }
+    };
+
 
     return {
-        tasks: state.tasks,
-        loading: state.loading,
-        error: state.error,
-        addTask,
+        tasks,
+        loading,
+        error,
+        addTask, 
         toggleTask,
-        deleteTask,
-        clearCompletedTasks,
+        deleteTask: removeTask, 
+        clearCompletedTasks: clearTasks, 
+        updateTask,
+        dispatch, 
+        setError, 
     };
-};
+}

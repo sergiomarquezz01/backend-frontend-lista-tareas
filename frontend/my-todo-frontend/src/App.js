@@ -1,69 +1,123 @@
-// frontend/src/App.js
-
-import React from 'react';
-import './App.css'; 
-import TaskForm from './components/TaskForm';
+import React, { useState, useEffect } from 'react';
+import { useTaskReducer } from './hooks/useTaskReducer';
 import TaskList from './components/TaskList';
-import { useTaskReducer } from './hooks/useTaskReducer'; 
+import TaskForm from './components/TaskForm';
+import TaskEditForm from './components/TaskEditForm'; 
+import './App.css';
+
+
+const getInitialTheme = () => {
+    const savedTheme = localStorage.getItem('theme');
+  
+    return savedTheme ? savedTheme === 'dark' : true; 
+};
+
 
 function App() {
+    const { 
+        tasks, 
+        loading, 
+        error, 
+        addTask,        
+        toggleTask, 
+        deleteTask, 
+        clearCompletedTasks,
+        updateTask, 
+    } = useTaskReducer(); 
 
-  const { 
-    tasks, 
-    loading, 
-    error, 
-    addTask, 
-    toggleTask, 
-    deleteTask, 
-    clearCompletedTasks 
-  } = useTaskReducer();
+    const [editingTask, setEditingTask] = useState(null); 
 
-  const completedTasks = tasks.filter(t => t.completed);
-  const pendingTasks = tasks.filter(t => !t.completed);
 
-  return (
-    <div className="App">
-      <header className="App-header">
-        <h1>✅ Lista de Tareas Diarias </h1>
-        <p className="task-summary">
-          **{pendingTasks.length}** Pendientes | **{completedTasks.length}** Completadas
-        </p>
-      </header>
+    const [isDarkMode, setIsDarkMode] = useState(getInitialTheme);
 
-      <TaskForm onAddTask={addTask} />
+   
+    useEffect(() => {
+       
+        document.body.className = isDarkMode ? 'dark-mode' : 'light-mode';
+        
 
-      {/* Manejo de errores de nivel profesional */}
-      {error && <div className="error-message">Error: {error}</div>}
-      
-      {loading ? (
-        <div className="loading">Cargando tareas...</div>
-      ) : (
-        <>
-          <section className="task-section">
-            <h2>Tareas Pendientes</h2>
-            <TaskList tasks={pendingTasks} onToggle={toggleTask} onDelete={deleteTask} />
-            {pendingTasks.length === 0 && <p className="empty-message">🎉 ¡No tienes tareas pendientes!</p>}
-          </section>
+        localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+    }, [isDarkMode]);
 
-          <section className="task-section completed-tasks">
-            <div className="section-header">
-                <h2>Tareas Completadas</h2>
-                {/* 🌟 BOTÓN DE LIMPIEZA PROFESIONAL */}
-                {completedTasks.length > 0 && (
-                    <button 
-                        className="clear-button" 
-                        onClick={clearCompletedTasks}
-                    >
-                        🗑️ Limpiar ({completedTasks.length})
-                    </button>
-                )}
-            </div>
-            <TaskList tasks={completedTasks} onToggle={toggleTask} onDelete={deleteTask} />
-          </section>
-        </>
-      )}
-    </div>
-  );
+    const toggleTheme = () => {
+        setIsDarkMode(prevMode => !prevMode);
+    };
+
+
+
+    const handleStartEdit = (task) => {
+        setEditingTask(task);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingTask(null);
+    };
+
+    const handleSaveEdit = async (updatedTaskData) => {
+        try {
+            await updateTask(updatedTaskData); 
+            setEditingTask(null);
+        } catch (err) {
+            console.error("Error al guardar la edición:", err);
+        }
+    };
+
+    const renderContent = () => {
+        if (loading) {
+            return <div className="loading-state">Cargando tareas...</div>;
+        }
+        if (error) {
+            return <div className="error-state">ERROR: {error}</div>;
+        }
+        if (editingTask) {
+            return (
+                <TaskEditForm 
+                    task={editingTask}
+                    onSave={handleSaveEdit}
+                    onCancel={handleCancelEdit}
+                />
+            );
+        }
+        return (
+            <TaskList 
+                tasks={tasks} 
+                onToggle={toggleTask} 
+                onDelete={deleteTask} 
+                onStartEdit={handleStartEdit} 
+            />
+        );
+    };
+
+
+    return (
+        <div className="App">
+            <header>
+                <h1>Lista de Tareas (Dev Project)</h1>
+                
+                {/* 5. 🎯 BOTÓN PARA ACTIVAR/DESACTIVAR EL MODO OSCURO */}
+                <button className="theme-toggle-button" onClick={toggleTheme}>
+                    {isDarkMode ? '🌞 Modo Claro' : '🌙 Modo Oscuro'}
+                </button>
+            </header>
+            
+            {!editingTask && <TaskForm onAddTask={addTask} />}
+            
+            <main>
+                {renderContent()}
+            </main>
+
+            <footer>
+                <p>Tareas completadas: {tasks.filter(t => t.completed).length} de {tasks.length}</p>
+                <button 
+                    onClick={clearCompletedTasks} 
+                    disabled={tasks.filter(t => t.completed).length === 0 || editingTask}
+                    className="clear-button"
+                >
+                    Limpiar completadas
+                </button>
+            </footer>
+        </div>
+    );
 }
 
 export default App;
