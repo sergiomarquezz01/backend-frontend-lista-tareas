@@ -1,6 +1,3 @@
-
-Markdown
-
 # 📋 Task Manager Pro - Full Stack CRUD
 
 
