@@ -1,6 +1,3 @@
-Para darle un nivel de profesionalismo superior a tu repositorio, este README incluye insignias (badges), una arquitectura detallada, documentación de la API y una guía de configuración más técnica. Esto es lo que buscan los reclutadores en proyectos de portafolio.
-
-Copia y pega este código en tu archivo README.md:
 
 Markdown
 
